@@ -1,285 +1,253 @@
-// Student Management System - Main Frontend Application Logic
+// Student Management System - Plain JavaScript Frontend Logic
 const API_BASE_URL = 'http://127.0.0.1:8000/api/students/';
 
 // Application State
 let state = {
     students: [],
-    filteredStudents: [],
     editingId: null,
-    deletingId: null,
-    isApiConnected: false
+    isSubmitting: false
 };
 
-// DOM Elements
+// DOM References
 const elements = {
-    apiStatus: document.getElementById('api-status'),
-    tableBody: document.getElementById('student-table-body'),
-    loadingState: document.getElementById('loading-state'),
-    emptyState: document.getElementById('empty-state'),
-    searchInput: document.getElementById('search-input'),
-    courseFilter: document.getElementById('course-filter'),
-    btnRefresh: document.getElementById('btn-refresh'),
-    btnAddStudent: document.getElementById('btn-add-student'),
-    
-    // Stats
-    statTotalStudents: document.getElementById('stat-total-students'),
-    statTotalCourses: document.getElementById('stat-total-courses'),
-    statAvgAge: document.getElementById('stat-avg-age'),
-
-    // Student Form Modal
-    modal: document.getElementById('student-modal'),
-    modalTitle: document.getElementById('modal-title'),
-    modalClose: document.getElementById('modal-close'),
     studentForm: document.getElementById('student-form'),
-    studentId: document.getElementById('student-id'),
+    formHeading: document.getElementById('form-heading'),
+    studentIdInput: document.getElementById('student-id'),
     nameInput: document.getElementById('student-name'),
     emailInput: document.getElementById('student-email'),
     courseInput: document.getElementById('student-course'),
     ageInput: document.getElementById('student-age'),
-    btnCancel: document.getElementById('btn-cancel'),
-    btnSave: document.getElementById('btn-save'),
-    generalError: document.getElementById('general-error'),
-
-    // Delete Modal
-    deleteModal: document.getElementById('delete-modal'),
-    deleteStudentName: document.getElementById('delete-student-name'),
-    btnCancelDelete: document.getElementById('btn-cancel-delete'),
-    btnConfirmDelete: document.getElementById('btn-confirm-delete'),
-
-    // Toast Container
-    toastContainer: document.getElementById('toast-container')
+    submitBtn: document.getElementById('submit-btn'),
+    cancelEditBtn: document.getElementById('cancel-edit-btn'),
+    
+    searchInput: document.getElementById('search-input'),
+    totalCounter: document.getElementById('total-students-counter'),
+    
+    notificationArea: document.getElementById('notification-area'),
+    loadingIndicator: document.getElementById('loading-indicator'),
+    emptyState: document.getElementById('empty-state'),
+    errorState: document.getElementById('error-state'),
+    tableContainer: document.getElementById('table-container'),
+    tableBody: document.getElementById('student-table-body')
 };
 
-// Initialize Application
+// Event Listeners Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    initEventListeners();
+    elements.studentForm.addEventListener('submit', handleFormSubmit);
+    elements.cancelEditBtn.addEventListener('click', cancelEditMode);
+    elements.searchInput.addEventListener('input', handleSearch);
+
+    // Initial Load
     fetchStudents();
 });
 
-// Event Listeners Setup
-function initEventListeners() {
-    // Toolbar
-    elements.searchInput.addEventListener('input', applyFilters);
-    elements.courseFilter.addEventListener('change', applyFilters);
-    elements.btnRefresh.addEventListener('click', fetchStudents);
-
-    // Modal Actions
-    elements.btnAddStudent.addEventListener('click', () => openStudentModal());
-    elements.modalClose.addEventListener('click', closeStudentModal);
-    elements.btnCancel.addEventListener('click', closeStudentModal);
-    elements.studentForm.addEventListener('submit', handleFormSubmit);
-
-    // Delete Modal Actions
-    elements.btnCancelDelete.addEventListener('click', closeDeleteModal);
-    elements.btnConfirmDelete.addEventListener('click', handleConfirmDelete);
-
-    // Backdrop clicks
-    elements.modal.addEventListener('click', (e) => {
-        if (e.target === elements.modal) closeStudentModal();
-    });
-    elements.deleteModal.addEventListener('click', (e) => {
-        if (e.target === elements.deleteModal) closeDeleteModal();
-    });
-}
-
-// Fetch Students from REST API
+// Fetch All Students (Read)
 async function fetchStudents() {
-    showLoading(true);
+    showState('loading');
     try {
         const response = await fetch(API_BASE_URL);
-        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+        if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
         
         const data = await response.json();
-        state.students = data;
-        updateApiStatus(true);
-        updateCourseDropdownOptions();
-        applyFilters();
-        updateStats();
-    } catch (error) {
-        console.error('Error fetching students:', error);
-        updateApiStatus(false);
-        showToast('Failed to connect to Django API backend.', 'error');
-        renderTable([]);
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Update API Status Badge
-function updateApiStatus(isConnected) {
-    state.isApiConnected = isConnected;
-    if (isConnected) {
-        elements.apiStatus.className = 'status-badge status-online';
-        elements.apiStatus.innerHTML = '<span class="status-dot"></span> API Connected';
-    } else {
-        elements.apiStatus.className = 'status-badge status-offline';
-        elements.apiStatus.innerHTML = '<span class="status-dot"></span> Backend Offline';
-    }
-}
-
-// Apply Search and Course Filters
-function applyFilters() {
-    const searchTerm = elements.searchInput.value.toLowerCase().trim();
-    const selectedCourse = elements.courseFilter.value;
-
-    state.filteredStudents = state.students.filter(student => {
-        const matchesSearch = 
-            student.name.toLowerCase().includes(searchTerm) ||
-            student.email.toLowerCase().includes(searchTerm) ||
-            student.course.toLowerCase().includes(searchTerm);
+        state.students = Array.isArray(data) ? data : [];
         
-        const matchesCourse = selectedCourse === '' || student.course === selectedCourse;
-
-        return matchesSearch && matchesCourse;
-    });
-
-    renderTable(state.filteredStudents);
-}
-
-// Update Course Dropdown Options
-function updateCourseDropdownOptions() {
-    const selectedValue = elements.courseFilter.value;
-    const courses = [...new Set(state.students.map(s => s.course))].sort();
-
-    elements.courseFilter.innerHTML = '<option value="">All Courses</option>';
-    courses.forEach(course => {
-        const option = document.createElement('option');
-        option.value = course;
-        option.textContent = course;
-        if (course === selectedValue) option.selected = true;
-        elements.courseFilter.appendChild(option);
-    });
-}
-
-// Update Stats Dashboard Cards
-function updateStats() {
-    const totalStudents = state.students.length;
-    const uniqueCourses = new Set(state.students.map(s => s.course)).size;
-    
-    let avgAge = 0;
-    if (totalStudents > 0) {
-        const sumAge = state.students.reduce((acc, s) => acc + (parseInt(s.age) || 0), 0);
-        avgAge = (sumAge / totalStudents).toFixed(1);
+        updateTotalCounter(state.students.length);
+        renderStudents(state.students);
+    } catch (error) {
+        console.error('Fetch Students Error:', error);
+        showState('error');
+        showNotification('Unable to connect to Student Management API server.', 'error');
     }
-
-    elements.statTotalStudents.textContent = totalStudents;
-    elements.statTotalCourses.textContent = uniqueCourses;
-    elements.statAvgAge.textContent = avgAge;
 }
 
-// Render Table Rows
-function renderTable(students) {
+// Display UI States (loading, empty, error, content)
+function showState(stateName) {
+    elements.loadingIndicator.classList.add('hidden');
+    elements.emptyState.classList.add('hidden');
+    elements.errorState.classList.add('hidden');
+    elements.tableContainer.classList.add('hidden');
+
+    if (stateName === 'loading') {
+        elements.loadingIndicator.classList.remove('hidden');
+    } else if (stateName === 'empty') {
+        elements.emptyState.classList.remove('hidden');
+    } else if (stateName === 'error') {
+        elements.errorState.classList.remove('hidden');
+    } else if (stateName === 'content') {
+        elements.tableContainer.classList.remove('hidden');
+    }
+}
+
+// Render Student Records safely using DOM methods (protecting against XSS)
+function renderStudents(studentsList) {
     elements.tableBody.innerHTML = '';
 
-    if (students.length === 0) {
-        elements.emptyState.classList.remove('hidden');
+    if (!studentsList || studentsList.length === 0) {
+        showState('empty');
         return;
     }
 
-    elements.emptyState.classList.add('hidden');
+    showState('content');
 
-    students.forEach(student => {
+    studentsList.forEach(student => {
         const tr = document.createElement('tr');
-        
-        const formattedDate = new Date(student.created_at).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
 
-        tr.innerHTML = `
-            <td>#${student.id}</td>
-            <td>
-                <div class="student-name">${escapeHtml(student.name)}</div>
-            </td>
-            <td>
-                <span class="student-email">${escapeHtml(student.email)}</span>
-            </td>
-            <td>
-                <span class="course-badge">${escapeHtml(student.course)}</span>
-            </td>
-            <td>${student.age} yrs</td>
-            <td>${formattedDate}</td>
-            <td class="text-right">
-                <div class="actions-cell">
-                    <button class="btn-icon btn-edit" title="Edit Student" onclick="openStudentModal(${student.id})">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                    </button>
-                    <button class="btn-icon btn-delete" title="Delete Student" onclick="openDeleteModal(${student.id}, '${escapeHtml(student.name)}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                    </button>
-                </div>
-            </td>
-        `;
+        // ID
+        const tdId = document.createElement('td');
+        tdId.textContent = `#${student.id}`;
+        tr.appendChild(tdId);
+
+        // Name
+        const tdName = document.createElement('td');
+        tdName.textContent = student.name;
+        tr.appendChild(tdName);
+
+        // Email
+        const tdEmail = document.createElement('td');
+        tdEmail.textContent = student.email;
+        tr.appendChild(tdEmail);
+
+        // Course
+        const tdCourse = document.createElement('td');
+        tdCourse.textContent = student.course;
+        tr.appendChild(tdCourse);
+
+        // Age
+        const tdAge = document.createElement('td');
+        tdAge.textContent = `${student.age}`;
+        tr.appendChild(tdAge);
+
+        // Actions
+        const tdActions = document.createElement('td');
+        tdActions.className = 'text-right';
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'table-actions';
+
+        // Edit Button
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'btn btn-secondary btn-sm';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => populateEditForm(student));
+        actionsDiv.appendChild(editBtn);
+
+        // Delete Button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'btn btn-danger btn-sm';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', () => handleDeleteStudent(student.id, student.name));
+        actionsDiv.appendChild(deleteBtn);
+
+        tdActions.appendChild(actionsDiv);
+        tr.appendChild(tdActions);
+
         elements.tableBody.appendChild(tr);
     });
 }
 
-// Open Form Modal (Create or Edit)
-function openStudentModal(id = null) {
-    clearFormErrors();
-    state.editingId = id;
-
-    if (id) {
-        const student = state.students.find(s => s.id === id);
-        if (!student) return;
-        elements.modalTitle.textContent = 'Edit Student Details';
-        elements.studentId.value = student.id;
-        elements.nameInput.value = student.name;
-        elements.emailInput.value = student.email;
-        elements.courseInput.value = student.course;
-        elements.ageInput.value = student.age;
-    } else {
-        elements.modalTitle.textContent = 'Add New Student';
-        elements.studentForm.reset();
-        elements.studentId.value = '';
+// Client-Side Search
+function handleSearch() {
+    const query = elements.searchInput.value.toLowerCase().trim();
+    if (!query) {
+        renderStudents(state.students);
+        updateTotalCounter(state.students.length);
+        return;
     }
 
-    elements.modal.classList.remove('hidden');
+    const filtered = state.students.filter(student => 
+        student.name.toLowerCase().includes(query) ||
+        student.email.toLowerCase().includes(query) ||
+        student.course.toLowerCase().includes(query)
+    );
+
+    renderStudents(filtered);
+    updateTotalCounter(filtered.length);
 }
 
-// Close Form Modal
-function closeStudentModal() {
-    elements.modal.classList.add('hidden');
-    clearFormErrors();
-    state.editingId = null;
+// Client-Side Form Validation
+function validateForm() {
+    clearFieldErrors();
+    let isValid = true;
+
+    const name = elements.nameInput.value;
+    const email = elements.emailInput.value;
+    const course = elements.courseInput.value;
+    const age = elements.ageInput.value;
+
+    // Name Validation
+    if (!name || !name.trim()) {
+        showFieldError('name', 'Name is required and cannot be empty or spaces-only.');
+        isValid = false;
+    }
+
+    // Email Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !email.trim()) {
+        showFieldError('email', 'Email is required.');
+        isValid = false;
+    } else if (!emailRegex.test(email.trim())) {
+        showFieldError('email', 'Please enter a valid email address.');
+        isValid = false;
+    }
+
+    // Course Validation
+    if (!course || !course.trim()) {
+        showFieldError('course', 'Course is required and cannot be empty or spaces-only.');
+        isValid = false;
+    }
+
+    // Age Validation
+    const ageNum = parseInt(age, 10);
+    if (!age || isNaN(ageNum)) {
+        showFieldError('age', 'Age is required.');
+        isValid = false;
+    } else if (ageNum < 16 || ageNum > 100) {
+        showFieldError('age', 'Age must be an integer between 16 and 100.');
+        isValid = false;
+    }
+
+    return isValid;
 }
 
-// Clear Validation Errors
-function clearFormErrors() {
+// Show Field Error
+function showFieldError(field, message) {
+    const errorSpan = document.getElementById(`error-${field}`);
+    const input = elements[`${field}Input`];
+    if (errorSpan) errorSpan.textContent = message;
+    if (input) input.classList.add('is-invalid');
+}
+
+// Clear Field Errors
+function clearFieldErrors() {
     ['name', 'email', 'course', 'age'].forEach(field => {
-        const errDiv = document.getElementById(`error-${field}`);
+        const errorSpan = document.getElementById(`error-${field}`);
         const input = elements[`${field}Input`];
-        if (errDiv) errDiv.textContent = '';
+        if (errorSpan) errorSpan.textContent = '';
         if (input) input.classList.remove('is-invalid');
     });
-    elements.generalError.classList.add('hidden');
-    elements.generalError.textContent = '';
 }
 
-// Handle Form Submission (POST/PUT)
+// Form Submission (Create or Update)
 async function handleFormSubmit(e) {
     e.preventDefault();
-    clearFormErrors();
+    if (state.isSubmitting) return;
+
+    if (!validateForm()) return;
 
     const payload = {
-        name: elements.nameInput.value,
-        email: elements.emailInput.value,
-        course: elements.courseInput.value,
-        age: parseInt(elements.ageInput.value) || ''
+        name: elements.nameInput.value.trim(),
+        email: elements.emailInput.value.trim().toLowerCase(),
+        course: elements.courseInput.value.trim(),
+        age: parseInt(elements.ageInput.value, 10)
     };
 
-    const isEdit = Boolean(state.editingId);
-    const url = isEdit ? `${API_BASE_URL}${state.editingId}/` : API_BASE_URL;
-    const method = isEdit ? 'PUT' : 'POST';
+    const isEditing = Boolean(state.editingId);
+    const url = isEditing ? `${API_BASE_URL}${state.editingId}/` : API_BASE_URL;
+    const method = isEditing ? 'PUT' : 'POST';
 
-    setFormLoading(true);
+    setSubmitting(true);
 
     try {
         const response = await fetch(url, {
@@ -291,144 +259,138 @@ async function handleFormSubmit(e) {
         const data = await response.json();
 
         if (response.ok) {
-            showToast(isEdit ? 'Student updated successfully!' : 'Student created successfully!', 'success');
-            closeStudentModal();
+            const successMsg = isEditing ? 'Student updated successfully!' : 'Student created successfully!';
+            showNotification(successMsg, 'success');
+            resetForm();
             fetchStudents();
         } else {
-            // Handle Validation Errors from DRF
-            handleValidationErrors(data);
+            // Display backend validation error messages
+            handleBackendErrors(data);
         }
     } catch (error) {
-        console.error('Error submitting form:', error);
-        elements.generalError.textContent = 'Network error. Please check backend connection.';
-        elements.generalError.classList.remove('hidden');
+        console.error('Submit Error:', error);
+        showNotification('Failed to submit form. Check server connection.', 'error');
     } finally {
-        setFormLoading(false);
+        setSubmitting(false);
     }
 }
 
-// Handle Django REST Framework Validation Errors
-function handleValidationErrors(errorData) {
-    let hasFieldErrors = false;
+// Map DRF Backend Validation Messages to Fields
+function handleBackendErrors(errorObj) {
+    let unmappedMessages = [];
 
-    for (const [field, messages] of Object.entries(errorData)) {
-        const errDiv = document.getElementById(`error-${field}`);
-        const input = elements[`${field}Input`];
+    for (const [field, messages] of Object.entries(errorObj)) {
         const msgText = Array.isArray(messages) ? messages.join(' ') : messages;
-
-        if (errDiv && input) {
-            errDiv.textContent = msgText;
-            input.classList.add('is-invalid');
-            hasFieldErrors = true;
+        if (['name', 'email', 'course', 'age'].includes(field)) {
+            showFieldError(field, msgText);
+        } else {
+            unmappedMessages.push(msgText);
         }
     }
 
-    if (!hasFieldErrors && errorData.detail) {
-        elements.generalError.textContent = errorData.detail;
-        elements.generalError.classList.remove('hidden');
+    if (unmappedMessages.length > 0) {
+        showNotification(unmappedMessages.join(' '), 'error');
+    } else {
+        showNotification('Validation error. Please review the highlighted fields.', 'error');
     }
 }
 
-// Open Delete Modal
-function openDeleteModal(id, name) {
-    state.deletingId = id;
-    elements.deleteStudentName.textContent = name;
-    elements.deleteModal.classList.remove('hidden');
+// Populate Form for Editing (Update)
+function populateEditForm(student) {
+    state.editingId = student.id;
+    elements.studentIdInput.value = student.id;
+    elements.nameInput.value = student.name;
+    elements.emailInput.value = student.email;
+    elements.courseInput.value = student.course;
+    elements.ageInput.value = student.age;
+
+    elements.formHeading.textContent = `Edit Student (#${student.id})`;
+    elements.submitBtn.textContent = 'Update Student';
+    elements.cancelEditBtn.classList.remove('hidden');
+
+    clearFieldErrors();
+    elements.nameInput.focus();
 }
 
-// Close Delete Modal
-function closeDeleteModal() {
-    elements.deleteModal.classList.add('hidden');
-    state.deletingId = null;
+// Cancel Edit Mode
+function cancelEditMode() {
+    resetForm();
+    showNotification('Edit mode cancelled.', 'info');
 }
 
-// Handle Delete Execution
-async function handleConfirmDelete() {
-    if (!state.deletingId) return;
+// Reset Form State
+function resetForm() {
+    state.editingId = null;
+    elements.studentForm.reset();
+    elements.studentIdInput.value = '';
+    
+    elements.formHeading.textContent = 'Add New Student';
+    elements.submitBtn.textContent = 'Add Student';
+    elements.cancelEditBtn.classList.add('hidden');
+    
+    clearFieldErrors();
+}
 
-    setDeleteLoading(true);
+// Delete Student
+async function handleDeleteStudent(id, name) {
+    const confirmed = window.confirm(`Are you sure you want to delete student "${name}" (#${id})?`);
+    if (!confirmed) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}${state.deletingId}/`, {
+        const response = await fetch(`${API_BASE_URL}${id}/`, {
             method: 'DELETE'
         });
 
         if (response.ok || response.status === 204) {
-            showToast('Student deleted successfully!', 'success');
-            closeDeleteModal();
+            showNotification(`Student "${name}" deleted successfully.`, 'success');
+            
+            // Reset edit form if we were editing the deleted student
+            if (state.editingId === id) {
+                resetForm();
+            }
+
             fetchStudents();
         } else {
-            showToast('Failed to delete student.', 'error');
+            showNotification('Failed to delete student.', 'error');
         }
     } catch (error) {
-        console.error('Error deleting student:', error);
-        showToast('Network error while deleting student.', 'error');
-    } finally {
-        setDeleteLoading(false);
+        console.error('Delete Error:', error);
+        showNotification('Network error while deleting student.', 'error');
     }
 }
 
-// UI State Helpers
-function showLoading(isLoading) {
-    if (isLoading) {
-        elements.loadingState.classList.remove('hidden');
-        elements.emptyState.classList.add('hidden');
+// Disable Submit Button During Network Operations
+function setSubmitting(isSubmitting) {
+    state.isSubmitting = isSubmitting;
+    elements.submitBtn.disabled = isSubmitting;
+    if (isSubmitting) {
+        elements.submitBtn.textContent = state.editingId ? 'Updating...' : 'Saving...';
     } else {
-        elements.loadingState.classList.add('hidden');
+        elements.submitBtn.textContent = state.editingId ? 'Update Student' : 'Add Student';
     }
 }
 
-function setFormLoading(isLoading) {
-    const btnText = elements.btnSave.querySelector('.btn-text');
-    const spinner = elements.btnSave.querySelector('.btn-spinner');
-    elements.btnSave.disabled = isLoading;
-    if (isLoading) {
-        btnText.classList.add('hidden');
-        spinner.classList.remove('hidden');
-    } else {
-        btnText.classList.remove('hidden');
-        spinner.classList.add('hidden');
-    }
+// Update Total Counter Display
+function updateTotalCounter(count) {
+    elements.totalCounter.textContent = `Total: ${count}`;
 }
 
-function setDeleteLoading(isLoading) {
-    const btnText = elements.btnConfirmDelete.querySelector('.btn-text');
-    const spinner = elements.btnConfirmDelete.querySelector('.btn-spinner');
-    elements.btnConfirmDelete.disabled = isLoading;
-    if (isLoading) {
-        btnText.classList.add('hidden');
-        spinner.classList.remove('hidden');
-    } else {
-        btnText.classList.remove('hidden');
-        spinner.classList.add('hidden');
-    }
-}
+// Show Toast Notification
+function showNotification(message, type = 'success') {
+    elements.notificationArea.innerHTML = '';
 
-// Toast Notification System
-function showToast(message, type = 'success') {
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.className = `toast toast-${type === 'error' ? 'error' : 'success'}`;
     
-    const iconSvg = type === 'success' 
-        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>'
-        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    const textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    toast.appendChild(textSpan);
 
-    toast.innerHTML = `${iconSvg} <span>${escapeHtml(message)}</span>`;
-    elements.toastContainer.appendChild(toast);
+    elements.notificationArea.appendChild(toast);
 
     setTimeout(() => {
-        toast.style.animation = 'toastIn 0.3s ease reverse';
-        setTimeout(() => toast.remove(), 300);
-    }, 3500);
-}
-
-// Utility: HTML Escaping
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, 4000);
 }
