@@ -1,5 +1,8 @@
 // Student Management System - Plain JavaScript Frontend Logic
-const API_BASE_URL = 'http://127.0.0.1:8000/api/students/';
+const API_BASE_URL = window.location.origin.includes('5500')
+    ? 'http://127.0.0.1:8000/api/students/'
+    : '/api/students/';
+
 
 // Application State
 let state = {
