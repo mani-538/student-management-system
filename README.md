@@ -9,6 +9,7 @@ A full-stack web application designed for academic institution management to cre
 - [Problem Statement](#problem-statement)
 - [Objectives](#objectives)
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Technology Stack](#technology-stack)
 - [System Architecture](#system-architecture)
 - [Project Folder Structure](#project-folder-structure)
@@ -17,6 +18,7 @@ A full-stack web application designed for academic institution management to cre
 - [API Endpoint Documentation](#api-endpoint-documentation)
 - [Data Fields & Validation Rules](#data-fields--validation-rules)
 - [Automated Testing](#automated-testing)
+- [Testing Summary](#testing-summary)
 - [Security & Quality Measures](#security--quality-measures)
 - [Future Enhancements](#future-enhancements)
 - [Repository Link](#repository-link)
@@ -57,6 +59,30 @@ The Student Management System solves these issues by providing a centralized dat
 
 ---
 
+## 🖼️ Screenshots
+
+### Desktop Dashboard & Student Records
+![Desktop dashboard and student records](docs/screenshots/student-dashboard.png)
+*Desktop dashboard and student records*
+
+### Client-Side Validation
+![Client-side age validation](docs/screenshots/validation-error.png)
+*Client-side age validation*
+
+### Student Update Interface
+![Student update interface](docs/screenshots/edit-student.png)
+*Student update interface*
+
+### Responsive Mobile Layout
+![Responsive mobile layout](docs/screenshots/responsive-mobile.png)
+*Responsive mobile layout*
+
+### Postman API Test Suite Results
+![Postman collection result showing 22 passed and 0 failed](docs/screenshots/postman-test-results.png)
+*Postman collection result showing 22 passed and 0 failed*
+
+---
+
 ## 🛠️ Technology Stack
 - **Frontend**: Plain HTML5, CSS3, JavaScript (ES6+ Vanilla JS)
 - **Backend**: Python 3.13, Django 6.1, Django REST Framework (DRF) 3.18
@@ -89,6 +115,15 @@ student-management-system/
 ├── requirements.txt         # Python project dependencies
 ├── README.md                # Project documentation
 ├── .venv/                   # Python virtual environment (ignored by Git)
+├── docs/                    # Project documentation & assets
+│   ├── postman/             # Postman API Collection
+│   │   └── Student_Management_API.postman_collection.json
+│   └── screenshots/         # Application & testing screenshots
+│       ├── edit-student.png
+│       ├── postman-test-results.png
+│       ├── responsive-mobile.png
+│       ├── student-dashboard.png
+│       └── validation-error.png
 ├── frontend/                # Self-contained frontend application
 │   ├── index.html           # HTML5 structure & accessibility labels
 │   ├── styles.css           # Plain CSS responsive layout & styling
@@ -232,6 +267,15 @@ System check identified no issues (0 silenced).
 9. `test_age_below_minimum`: Enforces minimum age boundary ($< 16$).
 10. `test_age_above_maximum`: Enforces maximum age boundary ($> 100$).
 11. `test_nonexistent_student_id`: Confirms `404 Not Found` response for invalid IDs.
+
+---
+
+## 📊 Testing Summary
+
+- **11 Django automated tests passed** (0 failures, 0 errors).
+- **22 Postman assertions passed**.
+- **0 Postman assertions failed**.
+- **Browser CRUD and responsive-layout testing passed**.
 
 ---
 
