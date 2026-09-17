@@ -2,6 +2,8 @@
 
 A full-stack web application designed for academic institution management to create, view, update, search, and delete student records. Built with a **Django REST Framework** backend, an **SQLite** database, and a self-contained **Vanilla HTML/CSS/JavaScript** frontend.
 
+🌐 **Live Demo:** [https://student-management-system-zp79.onrender.com](https://student-management-system-zp79.onrender.com)
+
 ---
 
 ## 📌 Table of Contents
@@ -21,6 +23,7 @@ A full-stack web application designed for academic institution management to cre
 - [Testing Summary](#testing-summary)
 - [Security & Quality Measures](#security--quality-measures)
 - [Future Enhancements](#future-enhancements)
+- [Live Deployment](#live-deployment)
 - [Repository Link](#repository-link)
 
 ---
@@ -292,6 +295,16 @@ System check identified no issues (0 silenced).
 - **User Authentication**: Add JWT/Session-based authentication for institutional admin roles.
 - **Export Capabilities**: Allow exporting student tables to CSV and PDF formats.
 - **Department & Grade Tracking**: Extend data models to track GPA, major, and semester enrollment.
+
+---
+
+## 🌐 Live Deployment
+
+The application is publicly deployed on Render with a PostgreSQL database:
+
+[Open the live Student Management System](https://student-management-system-zp79.onrender.com)
+
+> The free Render service may take up to one minute to start after a period of inactivity.
 
 ---
 
